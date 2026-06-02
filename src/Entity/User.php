@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\UserRepository;
 use App\State\CurrentUserProvider;
@@ -19,7 +20,7 @@ use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
-#[ORM\Table(name: 'users')] // Aligned with your database table reference
+#[ORM\Table(name: 'users')]
 #[UniqueEntity(fields: ['email'], message: 'There is already an account with this email.')]
 #[ApiResource(
     operations: [
@@ -36,10 +37,21 @@ use Symfony\Component\Validator\Constraints as Assert;
             security: "is_granted('ROLE_USER')",
             openapi: new Operation(summary: 'Retrieves the currently authenticated user profile.')
         ),
-        new Post(
+        new Patch(
+            uriTemplate: '/me',
+            provider: CurrentUserProvider::class,
+            uriVariables: [],
             denormalizationContext: ['groups' => ['user:write']],
             normalizationContext: ['groups' => ['user:read']],
-            validationContext: ['groups' => ['user:create']], // Triggers validation rules properly
+            validationContext: ['groups' => ['user:update']],
+            security: "is_granted('ROLE_USER')",
+            openapi: new Operation(summary: 'Updates the authenticated user profile details.')
+        ),
+        new Post(
+            uriTemplate:'/users',
+            denormalizationContext: ['groups' => ['user:write']],
+            normalizationContext: ['groups' => ['user:read']],
+            validationContext: ['groups' => ['user:create']],
             processor: UserPasswordHasherStateProcessor::class,
             openapi: new Operation(summary: 'Registers a new user inside the database space.')
         )
@@ -50,7 +62,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
-    #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')] // Use UUIDs instead of auto-increment integers
+    #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
     #[Groups(['user:read', 'conversion:read'])]
     private ?string $id = null;
 
@@ -60,7 +72,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read', 'user:write', 'conversion:read'])]
     private ?string $email = null;
 
-    #[ORM\Column(name: 'password_hash', length: 255)] // Maps password field explicitly to password_hash
+    #[ORM\Column(name: 'password_hash', length: 255)]
     private ?string $password = null;
 
     #[Assert\NotBlank(groups: ['user:create'])]
@@ -68,14 +80,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:write'])]
     private ?string $plainPassword = null;
 
-    #[ORM\Column(name: 'first_name', length: 100)]
+   #[ORM\Column(name: 'first_name', length: 100)]
     #[Assert\NotBlank(groups: ['user:create', 'user:update'])]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read', 'user:write'])] // 👈 MUST HAVE 'user:write'
+    #[SerializedName('firstName')]
     private ?string $firstName = null;
 
     #[ORM\Column(name: 'last_name', length: 100)]
     #[Assert\NotBlank(groups: ['user:create', 'user:update'])]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read', 'user:write'])] // 👈 MUST HAVE 'user:write'
     private ?string $lastName = null;
 
     #[ORM\Column(length: 20)]
@@ -84,13 +97,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 20)]
     #[Groups(['user:read'])]
-    private string $status = 'active'; // active | pending | suspended
+    private string $status = 'active';
 
     #[ORM\Column(length: 10, options: ['default' => 'en'])]
     private string $locale = 'en';
 
     #[ORM\Column(length: 50, options: ['default' => 'UTC'])]
     private string $timezone = 'UTC';
+
+    #[ORM\Column(name: 'profile_picture', type: 'string', length: 255, nullable: true)]
+    #[Groups(['user:read', 'user:write', 'conversion:read'])]
+    private ?string $profilePicture = null;
 
     #[ORM\Column(type: 'datetimetz_immutable', nullable: true)]
     private ?\DateTimeImmutable $emailVerifiedAt = null;
@@ -105,7 +122,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private \DateTimeImmutable $updatedAt;
 
     #[ORM\Column(type: 'datetimetz_immutable', nullable: true)]
-    private ?\DateTimeImmutable $deletedAt = null; // Used for Soft Delete
+    private ?\DateTimeImmutable $deletedAt = null;
 
     public function __construct()
     {
@@ -125,7 +142,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function setEmail(string $email): static
     {
-        $this->email = strtolower(trim($email)); // Matches the lowercase/trimmed schema rule
+        $this->email = strtolower(trim($email));
         return $this;
     }
 
@@ -142,7 +159,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setRoles(array $roles): static
     {
         if (!empty($roles)) {
-            $this->role = $roles[0]; // Framework wrapper logic fallback
+            $this->role = $roles[0];
         }
         return $this;
     }
@@ -174,7 +191,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->plainPassword = null;
     }
 
-    // Helper method to keep a computed full name if your UI depends on it
     #[Groups(['user:read'])]
     public function getFullName(): string
     {
@@ -200,6 +216,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setLastName(string $lastName): static
     {
         $this->lastName = $lastName;
+        return $this;
+    }
+
+    public function getProfilePicture(): ?string
+    {
+        return $this->profilePicture;
+    }
+
+    public function setProfilePicture(?string $profilePicture): static
+    {
+        $this->profilePicture = $profilePicture;
         return $this;
     }
 }

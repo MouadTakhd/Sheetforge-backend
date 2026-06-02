@@ -25,6 +25,13 @@ services:
       APP_ENV: ${APP_ENV:-dev}
       APP_SECRET: ${APP_SECRET:-!ChangeMe!}
       DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-!ChangeMe!}@database:5432/${POSTGRES_DB:-app}?serverVersion=${POSTGRES_VERSION:-16}&charset=utf8
+      
+      # Injecting MinIO variables directly into the backend environment scope
+      AWS_S3_KEY: ${AWS_S3_KEY:-local_s3_user}
+      AWS_S3_SECRET: ${AWS_S3_SECRET:-local_s3_password}
+      AWS_S3_REGION: ${AWS_S3_REGION:-us-east-1}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-conversion-bucket}
+      AWS_S3_ENDPOINT: http://s3:9000
     volumes:
       - .:/srv/app:rw
     ports:
@@ -32,7 +39,24 @@ services:
     depends_on:
       database:
         condition: service_healthy
+      s3:
+        condition: service_started
+
+  # Dedicated Local Cloud Storage Engine
+  s3:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"       # S3 API operations endpoint (Where Symfony streams data)
+      - "9001:9001"       # Visual Web Console Dashboard interface
+    environment:
+      MINIO_ROOT_USER: ${AWS_S3_KEY:-local_s3_user}
+      MINIO_ROOT_PASSWORD: ${AWS_S3_SECRET:-local_s3_password}
+    volumes:
+      - s3_data:/data
+    command: server /data --console-address ":9001"
+
 volumes:
 ###> doctrine/doctrine-bundle ###
   database_data:
 ###< doctrine/doctrine-bundle ###
+  s3_data:                # Prevents local asset clear outs on container rebuilds

@@ -14,7 +14,7 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class UpdateMeController extends AbstractController
 {
-    #[Route('/api/me', name: 'api_update_me', methods: ['PATCH'])]
+    #[Route('/api/me', name: 'api_update_me', methods: ['PATCH', 'PUT'])]
     public function __invoke(
         #[CurrentUser] ?User $user,
         Request $request,
@@ -22,38 +22,55 @@ class UpdateMeController extends AbstractController
         SerializerInterface $serializer,
         ValidatorInterface $validator
     ): JsonResponse {
+        // 1. Validate active session matrix existence
         if (!$user) {
             return $this->json(['message' => 'JWT Token is missing or invalid.'], 401);
         }
 
-        // Decode the incoming application/merge-patch+json payload
         $data = json_decode($request->getContent(), true);
-        if (!$data) {
-            return $this->json(['message' => 'Invalid JSON payload.'], 400);
+        if ($data === null) {
+            return $this->json(['message' => 'Invalid JSON payload structure.'], 400);
         }
 
-        // Dynamically mutate fields only if they exist in the payload
-        if (array_key_exists('fullName', $data)) {
-            $user->setFullName($data['fullName']);
+        // 2. HARDENED MASS-ASSIGNMENT GUARD
+        // Block mutations to security permissions, clearance roles, or status tracking arrays
+        $protectedFields = ['role', 'roles', 'status', 'id', 'email', 'password', 'passwordHash'];
+        foreach ($protectedFields as $field) {
+            if (array_key_exists($field, $data)) {
+                return $this->json([
+                    'message' => 'Access denied: Cannot mutate administrative or security parameters.'
+                ], 403);
+            }
+        }
+
+        // 3. SECURE PROPERTY INJECTION (camelCase Frontend aligned)
+        if (array_key_exists('firstName', $data)) {
+            $user->setFirstName($data['firstName']);
+        }
+        
+        if (array_key_exists('lastName', $data)) {
+            $user->setLastName($data['lastName']);
         }
         
         if (array_key_exists('profilePicture', $data)) {
             $user->setProfilePicture($data['profilePicture']);
         }
 
-        // Run validation rules specifically against the user entity state
+        // 4. UNIFIED CONSTRAINTS VALIDATION
+        // Passing 'user:update' alongside your entity validation rules
         $errors = $validator->validate($user, null, ['user:update']);
         if (count($errors) > 0) {
             return $this->json([
                 'title' => 'An error occurred',
-                'detail' => $errors->get(0)->getMessage()
+                'detail' => sprintf('%s: %s', $errors->get(0)->getPropertyPath(), $errors->get(0)->getMessage()),
+                'code' => 422
             ], 422);
         }
 
-        // Flush directly to database
+        // 5. PERSIST TO INFRASTRUCTURE GRID
         $em->flush();
 
-        // Serialize the clean response matching your user:read rules
+        // 6. SERIALIZE ACCORDING TO YOUR NORMALIZATION GROUPS
         $jsonResponse = $serializer->serialize($user, 'json', ['groups' => ['user:read']]);
         return new JsonResponse($jsonResponse, 200, [], true);
     }
