@@ -14,7 +14,7 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class UpdateMeController extends AbstractController
 {
-    #[Route('/api/me', name: 'api_update_me', methods: ['PATCH', 'PUT'])]
+    #[Route('/api/me', name: 'api_update_me', methods: ['PATCH'])]
     public function __invoke(
         #[CurrentUser] ?User $user,
         Request $request,
@@ -22,55 +22,49 @@ class UpdateMeController extends AbstractController
         SerializerInterface $serializer,
         ValidatorInterface $validator
     ): JsonResponse {
-        // 1. Validate active session matrix existence
         if (!$user) {
             return $this->json(['message' => 'JWT Token is missing or invalid.'], 401);
         }
 
         $data = json_decode($request->getContent(), true);
         if ($data === null) {
-            return $this->json(['message' => 'Invalid JSON payload structure.'], 400);
+            return $this->json(['message' => 'Invalid JSON payload.'], 400);
         }
 
-        // 2. HARDENED MASS-ASSIGNMENT GUARD
-        // Block mutations to security permissions, clearance roles, or status tracking arrays
-        $protectedFields = ['role', 'roles', 'status', 'id', 'email', 'password', 'passwordHash'];
-        foreach ($protectedFields as $field) {
-            if (array_key_exists($field, $data)) {
-                return $this->json([
-                    'message' => 'Access denied: Cannot mutate administrative or security parameters.'
-                ], 403);
-            }
+        // 1. HARDENED MASS-ASSIGNMENT SECURITY GUARD
+        if (array_key_exists('role', $data) || array_key_exists('status', $data) || array_key_exists('email', $data)) {
+            return $this->json(['message' => 'Access denied: Cannot mutate administrative or security credentials.'], 403);
         }
 
-        // 3. SECURE PROPERTY INJECTION (camelCase Frontend aligned)
+        // 2. EXPLICIT PROPERTY INJECTION
         if (array_key_exists('firstName', $data)) {
             $user->setFirstName($data['firstName']);
+            
+            // Validate specific property manually to completely bypass the email entity lifecycle check
+            $errors = $validator->validatePropertyValue($user, 'firstName', $data['firstName'], ['user:update']);
+            if (count($errors) > 0) {
+                return $this->json(['title' => 'Validation Failed', 'detail' => $errors->get(0)->getMessage(), 'code' => 422], 422);
+            }
         }
         
         if (array_key_exists('lastName', $data)) {
             $user->setLastName($data['lastName']);
+            
+            // Validate specific property manually to completely bypass the email entity lifecycle check
+            $errors = $validator->validatePropertyValue($user, 'lastName', $data['lastName'], ['user:update']);
+            if (count($errors) > 0) {
+                return $this->json(['title' => 'Validation Failed', 'detail' => $errors->get(0)->getMessage(), 'code' => 422], 422);
+            }
         }
         
         if (array_key_exists('profilePicture', $data)) {
             $user->setProfilePicture($data['profilePicture']);
         }
 
-        // 4. UNIFIED CONSTRAINTS VALIDATION
-        // Passing 'user:update' alongside your entity validation rules
-        $errors = $validator->validate($user, null, ['user:update']);
-        if (count($errors) > 0) {
-            return $this->json([
-                'title' => 'An error occurred',
-                'detail' => sprintf('%s: %s', $errors->get(0)->getPropertyPath(), $errors->get(0)->getMessage()),
-                'code' => 422
-            ], 422);
-        }
-
-        // 5. PERSIST TO INFRASTRUCTURE GRID
+        // 3. PERSIST CHANGES CLEANLY
         $em->flush();
 
-        // 6. SERIALIZE ACCORDING TO YOUR NORMALIZATION GROUPS
+        // 4. SERIALIZE ACCORDING TO NORMALIZATION GROUPS
         $jsonResponse = $serializer->serialize($user, 'json', ['groups' => ['user:read']]);
         return new JsonResponse($jsonResponse, 200, [], true);
     }

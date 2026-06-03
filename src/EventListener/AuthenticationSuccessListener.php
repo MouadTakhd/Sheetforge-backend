@@ -15,7 +15,7 @@ class AuthenticationSuccessListener
 {
     public function __construct(
         private EntityManagerInterface $em,
-        private RequestStack $requestStack // 👈 Safe request extractor injected here
+        private RequestStack $requestStack // Safe request extractor injected here
     ) {}
 
     public function __invoke(AuthenticationSuccessEvent $event): void

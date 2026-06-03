@@ -21,6 +21,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: 'users')]
+#[ORM\HasLifecycleCallbacks]
 #[UniqueEntity(fields: ['email'], message: 'There is already an account with this email.')]
 #[ApiResource(
     operations: [
@@ -37,16 +38,7 @@ use Symfony\Component\Validator\Constraints as Assert;
             security: "is_granted('ROLE_USER')",
             openapi: new Operation(summary: 'Retrieves the currently authenticated user profile.')
         ),
-        new Patch(
-            uriTemplate: '/me',
-            provider: CurrentUserProvider::class,
-            uriVariables: [],
-            denormalizationContext: ['groups' => ['user:write']],
-            normalizationContext: ['groups' => ['user:read']],
-            validationContext: ['groups' => ['user:update']],
-            security: "is_granted('ROLE_USER')",
-            openapi: new Operation(summary: 'Updates the authenticated user profile details.')
-        ),
+       
         new Post(
             uriTemplate:'/users',
             denormalizationContext: ['groups' => ['user:write']],
@@ -59,6 +51,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 )]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
+   
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
@@ -67,7 +60,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $id = null;
 
     #[ORM\Column(length: 180, unique: true)]
-    #[Assert\NotBlank(groups: ['user:create', 'user:update'])]
+    #[Assert\NotBlank(groups: ['user:create'])]
     #[Assert\Email(groups: ['user:create', 'user:update'])]
     #[Groups(['user:read', 'user:write', 'conversion:read'])]
     private ?string $email = null;
@@ -82,13 +75,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
    #[ORM\Column(name: 'first_name', length: 100)]
     #[Assert\NotBlank(groups: ['user:create', 'user:update'])]
-    #[Groups(['user:read', 'user:write'])] // 👈 MUST HAVE 'user:write'
+    #[Groups(['user:read', 'user:write'])] // MUST HAVE 'user:write'
     #[SerializedName('firstName')]
     private ?string $firstName = null;
 
     #[ORM\Column(name: 'last_name', length: 100)]
     #[Assert\NotBlank(groups: ['user:create', 'user:update'])]
-    #[Groups(['user:read', 'user:write'])] // 👈 MUST HAVE 'user:write'
+    #[Groups(['user:read', 'user:write'])] // MUST HAVE 'user:write'
     private ?string $lastName = null;
 
     #[ORM\Column(length: 20)]
@@ -124,9 +117,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(type: 'datetimetz_immutable', nullable: true)]
     private ?\DateTimeImmutable $deletedAt = null;
 
-    public function __construct()
+     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+    #[ORM\PreUpdate]
+    public function updateTimestamps(): void
+    {
         $this->updatedAt = new \DateTimeImmutable();
     }
 
