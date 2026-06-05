@@ -1,6 +1,13 @@
 # Target: app_php (Matches your docker-compose.yml)
 FROM php:8.2-apache AS app_php
 
+RUN { \
+    echo 'upload_max_filesize = 100M'; \
+    echo 'post_max_size = 108M'; \
+    echo 'memory_limit = 512M'; \
+    echo 'max_execution_time = 300'; \
+} > /usr/local/etc/php/conf.d/sheetforge-limits.ini
+
 # 1. Set the working directory
 WORKDIR /srv/app
 
@@ -30,7 +37,13 @@ RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf
 
 # 6. Install Composer globally
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+RUN echo "upload_max_filesize = 100M" >> /usr/local/etc/php/conf.d/docker-php-ext-uploads.ini \
+    && echo "post_max_size = 108M" >> /usr/local/etc/php/conf.d/docker-php-ext-uploads.ini \
+    && echo "memory_limit = 512M" >> /usr/local/etc/php/conf.d/docker-php-ext-uploads.ini \
+    && echo "max_execution_time = 300" >> /usr/local/etc/php/conf.d/docker-php-ext-uploads.ini
 
+# If your skeleton is running FrankenPHP, append the server-level request body allowance too:
+ENV FRANKENPHP_CONFIG="client_max_body_size 100M"
 # 7. Copy application code and set permissions
 COPY . /srv/app
 RUN chown -R www-data:www-data /srv/app

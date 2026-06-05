@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
 ###> doctrine/doctrine-bundle ###
   database:
@@ -26,6 +28,13 @@ services:
       APP_SECRET: ${APP_SECRET:-!ChangeMe!}
       DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-!ChangeMe!}@database:5432/${POSTGRES_DB:-app}?serverVersion=${POSTGRES_VERSION:-16}&charset=utf8
       
+      # ─── BAKE FILE ALLOWANCES DIRECTLY INTO SYMFONY RUNTIME ───
+      # The Symfony skeleton automatically reads these to modify php.ini & webserver limits!
+      PHP_INI_UPLOAD_MAX_FILESIZE: "100M"
+      PHP_INI_POST_MAX_SIZE: "108M"
+      PHP_INI_MEMORY_LIMIT: "512M"
+      PHP_INI_MAX_EXECUTION_TIME: "300"
+
       # Injecting MinIO variables directly into the backend environment scope
       AWS_S3_KEY: ${AWS_S3_KEY:-local_s3_user}
       AWS_S3_SECRET: ${AWS_S3_SECRET:-local_s3_password}
