@@ -42,9 +42,6 @@ RUN composer install \
     --no-interaction \
     --no-scripts
 
-# Warm up the cache for prod
-RUN php bin/console cache:warmup --env=prod
-
 # PHP limits
 RUN echo "upload_max_filesize=100M" > /usr/local/etc/php/conf.d/uploads.ini && \
     echo "post_max_size=108M" >> /usr/local/etc/php/conf.d/uploads.ini && \
@@ -56,4 +53,5 @@ RUN chown -R www-data:www-data /srv/app
 
 EXPOSE 80
 
-CMD ["apache2-foreground"]
+# Warm cache at runtime when real env vars are available, then start Apache
+CMD ["sh", "-c", "php bin/console cache:warmup --env=prod && apache2-foreground"]
