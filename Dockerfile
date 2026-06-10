@@ -2,7 +2,7 @@ FROM php:8.2-apache
 
 WORKDIR /srv/app
 
-# System deps
+# 1. Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
@@ -12,12 +12,11 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# PHP extensions
+# 2. Install PHP extensions
 RUN docker-php-ext-install intl pdo_pgsql zip opcache
 
-# Apache config
+# 3. Configure Apache document root for Symfony
 RUN a2enmod rewrite
-
 ENV APACHE_DOCUMENT_ROOT=/srv/app/public
 
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' \
@@ -26,32 +25,38 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' \
     /etc/apache2/apache2.conf \
     /etc/apache2/conf-available/*.conf
 
-# Composer
+# 4. Bring in Composer v2
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Copy project
+# 5. Copy the project source files
 COPY . .
 
-# Create a minimal .env so Symfony doesn't crash during build
-RUN echo "APP_ENV=prod\nAPP_SECRET=placeholder" > .env
+# 6. Define Build Arguments (passed from Render during build) with safe fallbacks
+ARG APP_ENV=prod
+ARG APP_SECRET=PlaceholderSecretForBuildTimeOnly
+ARG DATABASE_URL="postgresql://db_user:db_pass@127.0.0.1:5432/db_name?serverVersion=16"
 
-# Install dependencies
+# 7. Convert Build Arguments into Environment Variables for the Composer build scope
+ENV APP_ENV=${APP_ENV}
+ENV APP_SECRET=${APP_SECRET}
+ENV DATABASE_URL=${DATABASE_URL}
+
+# 8. Install dependencies and warm up production cache
 RUN composer install \
     --no-dev \
     --optimize-autoloader \
-    --no-interaction \
-    --no-scripts
+    --no-interaction
 
-# PHP limits
+# 9. Configure production PHP engine limits
 RUN echo "upload_max_filesize=100M" > /usr/local/etc/php/conf.d/uploads.ini && \
     echo "post_max_size=108M" >> /usr/local/etc/php/conf.d/uploads.ini && \
     echo "memory_limit=512M" >> /usr/local/etc/php/conf.d/uploads.ini && \
     echo "max_execution_time=300" >> /usr/local/etc/php/conf.d/uploads.ini
 
-# Permissions
+# 10. Enforce proper ownership for Apache web server access
 RUN chown -R www-data:www-data /srv/app
 
 EXPOSE 80
 
-# Warm cache at runtime when real env vars are available, then start Apache
-CMD ["sh", "-c", "php bin/console cache:warmup --env=prod && apache2-foreground"]
+# 11. Start the webserver directly
+CMD ["apache2-foreground"]
