@@ -1,6 +1,12 @@
 # Target: app_php (Matches your docker-compose.yml)
 FROM php:8.2-apache AS app_php
 
+COPY composer.json composer.lock ./
+
+RUN composer install --no-dev --optimize-autoloader
+
+COPY . .
+
 RUN { \
     echo 'upload_max_filesize = 100M'; \
     echo 'post_max_size = 108M'; \
