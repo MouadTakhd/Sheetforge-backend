@@ -51,12 +51,13 @@ RUN mkdir -p config/jwt && \
     openssl rsa -pubout \
         -in config/jwt/private.pem \
         -out config/jwt/public.pem \
-        -passin pass:ec4f03ebadee29c5cdad3be69fa8bbf7b5468172f52e025ba8127f34f90e747a && \
-    chown -R www-data:www-data config/jwt
+        -passin pass:ec4f03ebadee29c5cdad3be69fa8bbf7b5468172f52e025ba8127f34f90e747a
 
-# 9. Create empty .env and set permissions
-RUN touch .env
-RUN chown -R www-data:www-data /srv/app
+# 9. Create required directories, set permissions
+RUN touch .env && \
+    mkdir -p var/cache var/log && \
+    chown -R www-data:www-data /srv/app && \
+    chmod -R 775 var/
 
 EXPOSE 80
 
