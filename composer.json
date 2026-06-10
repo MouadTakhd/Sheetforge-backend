@@ -1,4 +1,7 @@
 {
+    "platform": {
+    "php": "8.2.0"
+    },
     "type": "project",
     "license": "proprietary",
     "minimum-stability": "stable",
