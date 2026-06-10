@@ -45,6 +45,9 @@ RUN echo "upload_max_filesize=100M" > /usr/local/etc/php/conf.d/uploads.ini && \
     echo "memory_limit=512M" >> /usr/local/etc/php/conf.d/uploads.ini && \
     echo "max_execution_time=300" >> /usr/local/etc/php/conf.d/uploads.ini
 
+# FIX: Create an empty .env file so Symfony's Dotenv file validation passes
+RUN touch .env
+
 # 8. Enforce proper ownership for Apache web server access
 RUN chown -R www-data:www-data /srv/app
 
