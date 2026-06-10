@@ -57,7 +57,7 @@ class ApiExceptionListener
         if ($_ENV['APP_ENV'] !== 'dev' || $_ENV['APP_ENV'] !== 'prod') {
             $response = new JsonResponse([
                 'title' => 'Internal Server Error',
-                'detail' => 'A generic server exception processing routine error occurred.',
+                'detail' => 'A generic server exception processing routine error occurred.'.$_ENV['APP_ENV'],
                 'code' => 500
             ], 500);
 
