@@ -15,7 +15,7 @@ class ApiExceptionListener
     public function __invoke(ExceptionEvent $event): void
     {
         $exception = $event->getThrowable();
-        
+
         // 1. Check if the error is a low-level Database/Driver crash
         if ($exception instanceof DriverException || str_contains($exception->getMessage(), 'SQLSTATE')) {
             $response = new JsonResponse([
@@ -23,7 +23,7 @@ class ApiExceptionListener
                 'detail' => 'The data subsystem is currently initializing or undergoing maintenance. Please try again shortly.',
                 'code' => 503
             ], 503);
-            
+
             $event->setResponse($response);
             return;
         }
@@ -54,7 +54,7 @@ class ApiExceptionListener
 
         // 4. Ultimate catch-all to prevent raw code trace leaks for unhandled server issues (500)
         // Only run this safety net if we aren't in strict local development mode
-        if ($_ENV['APP_ENV'] !== 'dev') {
+        if ($_ENV['APP_ENV'] !== 'dev' || $_ENV['APP_ENV'] !== 'prod') {
             $response = new JsonResponse([
                 'title' => 'Internal Server Error',
                 'detail' => 'A generic server exception processing routine error occurred.',
