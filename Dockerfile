@@ -62,4 +62,8 @@ RUN touch .env && \
 EXPOSE 80
 
 # 10. Clear cache at runtime and start Apache
-CMD ["sh", "-c", "php bin/console cache:clear --env=prod 2>&1 || true && apache2-foreground"]
+CMD ["sh", "-c", \
+    "mkdir -p var/cache/prod var/log && \
+    chmod -R 777 var/ && \
+    php bin/console cache:warmup --env=prod 2>&1 || true && \
+    apache2-foreground"]
