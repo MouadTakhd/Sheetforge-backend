@@ -52,16 +52,6 @@ class ApiExceptionListener
             return;
         }
 
-        // 4. Ultimate catch-all to prevent raw code trace leaks for unhandled server issues (500)
-        // Only run this safety net if we aren't in strict local development mode
-        if ($_ENV['APP_ENV'] !== 'dev' || $_ENV['APP_ENV'] !== 'prod') {
-            $response = new JsonResponse([
-                'title' => 'Internal Server Error',
-                'detail' => 'A generic server exception processing routine error occurred.'.$_ENV['APP_ENV'],
-                'code' => 500
-            ], 500);
 
-            $event->setResponse($response);
-        }
     }
 }
