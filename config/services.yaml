@@ -7,6 +7,7 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    env(FRONTEND_URL): 'http://localhost:5173'
 
 services:
     # default configuration for services in *this* file
@@ -16,10 +17,14 @@ services:
         public: true  
         bind:
             $persistProcessor: '@api_platform.doctrine.orm.state.persist_processor'     
+            # ─── CRITICAL AUTOWIRE FIXED BIND ───
+            $frontendUrl: '%env(FRONTEND_URL)%'
+
     # makes classes in src/ available to be used as services
     # this creates a service per class whose id is the fully-qualified class name
     App\:
         resource: '../src/'
+
     Aws\S3\S3Client:
         arguments:
             -
@@ -30,5 +35,6 @@ services:
                 credentials:
                     key: '%env(AWS_S3_KEY)%'
                     secret: '%env(AWS_S3_SECRET)%'
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

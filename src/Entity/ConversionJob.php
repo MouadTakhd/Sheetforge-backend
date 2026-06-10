@@ -7,6 +7,7 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\GetCollection;
+use App\Controller\TranspileDocumentAction;
 use App\Repository\ConversionJobRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -15,11 +16,12 @@ use App\State\ConversionJobPros;
 use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Serializer\Annotation\SerializedName;
 use Symfony\Component\Validator\Constraints as Assert;
+
 #[ORM\Entity(repositoryClass: ConversionJobRepository::class)]
 #[ORM\Table(name: 'conversion_jobs')]
 #[ORM\HasLifecycleCallbacks]
 #[ApiResource(
-   operations: [
+    operations: [
         // ─── RE-ACTIVATE AND SECURE GET COLLECTION ───
         new GetCollection(
             normalizationContext: ['groups' => ['job:read']],
@@ -33,12 +35,39 @@ use Symfony\Component\Validator\Constraints as Assert;
             normalizationContext: ['groups' => ['job:read']],
             security: "is_granted('ROLE_USER') and object.getUser() == user"
         ),
-         new Post(
+        new Post(
             denormalizationContext: ['groups' => ['job:write']],
             normalizationContext: ['groups' => ['job:read']],
             validationContext: ['groups' => ['job:create']],
             processor: ConversionJobPros::class, // 👈 REGISTERED NATIVELY
             security: "is_granted('ROLE_USER')"
+        ),
+        // ─── THE STRICT TYPING CONTAINER BYPASS ENGINE (OTHER API) ───
+        new Post(
+            name: 'transpile_document',
+            uriTemplate: '/conversion_jobs/transpile_document',
+            controller: TranspileDocumentAction::class,
+            deserialize: false,
+            security: "is_granted('ROLE_USER')",
+            extraProperties: [
+                'openapi_context' => [
+                    'summary' => 'Transpiles .docx, .pdf or images directly into structural text layers.',
+                    'requestBody' => [
+                        'content' => [
+                            'multipart/form-data' => [
+                                'schema' => [
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'file' => ['type' => 'string', 'format' => 'binary'],
+                                        'targetFormat' => ['type' => 'string'],
+                                        'originType' => ['type' => 'string']
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
         )
     ],
     normalizationContext: ['groups' => ['job:read']]
@@ -56,7 +85,8 @@ class ConversionJob
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private ?User $user = null;
 
-    #[ORM\ManyToOne(targetEntity: Template::class)] // 👈 Changed from string 'Template' to Template::class    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[ORM\ManyToOne(targetEntity: Template::class)] // 👈 Changed from string 'Template' to Template::class
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     #[Groups(['job:read', 'job:write'])]
     #[SerializedName('templateId')]
     private ?Template $template = null;
@@ -72,16 +102,18 @@ class ConversionJob
     #[SerializedName('conversionType')]
     private ?string $conversionType = null;
 
-    #[ORM\Column(name: 'source_format', length: 10)]
+    // ─── EXPANDED LENGTH & CHOICES FOR OTHER APIS ───
+    #[ORM\Column(name: 'source_format', length: 15)]
     #[Assert\NotBlank(groups: ['job:create'])]
-    #[Assert\Choice(choices: ['xlsx', 'csv', 'ods', 'pdf'], groups: ['job:create'])]
+    #[Assert\Choice(choices: ['xlsx', 'csv', 'ods', 'pdf', 'docx', 'doc', 'png', 'jpeg', 'jpg', 'webp'], groups: ['job:create'])]
     #[Groups(['job:read', 'job:write'])]
     #[SerializedName('sourceFormat')]
     private ?string $sourceFormat = null;
 
-    #[ORM\Column(name: 'target_format', length: 10)]
+    // ─── EXPANDED LENGTH & CHOICES FOR OTHER APIS ───
+    #[ORM\Column(name: 'target_format', length: 15)]
     #[Assert\NotBlank(groups: ['job:create'])]
-    #[Assert\Choice(choices: ['xlsx', 'csv', 'json', 'pdf', 'sql'], groups: ['job:create'])] //  FIXED: Added 'sql' here!    #[Groups(['job:read', 'job:write'])]
+    #[Assert\Choice(choices: ['xlsx', 'csv', 'json', 'pdf', 'sql', 'markdown', 'html', 'text'], groups: ['job:create'])] 
     #[Groups(['job:read', 'job:write'])] // 👈 ENSURE THIS LINE IS EXACTLY PRESENT
     #[SerializedName('targetFormat')]
     private ?string $targetFormat = null;
@@ -124,6 +156,11 @@ class ConversionJob
     #[Groups(['job:read'])]
     private Collection $files;
 
+    // ─── ADDED ORIGIN TYPE FOR THE OTHER APIS ───
+    #[ORM\Column(type: 'string', length: 20, nullable: true)]
+    #[Groups(['job:read', 'job:write'])]
+    private ?string $originType = null; 
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
@@ -163,4 +200,12 @@ class ConversionJob
     public function setFinishedAt(?\DateTimeImmutable $finishedAt): static { $this->finishedAt = $finishedAt; return $this; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function getFiles(): Collection { return $this->files; }
+    public function setCreatedAt(\DateTimeImmutable $createdAt): static 
+    { 
+        $this->createdAt = $createdAt; 
+        return $this; 
+    }
+    // ─── ORIGIN TYPE GETTER/SETTER ───
+    public function getOriginType(): ?string { return $this->originType; }
+    public function setOriginType(?string $originType): static { $this->originType = $originType; return $this; }
 }

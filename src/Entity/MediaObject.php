@@ -20,13 +20,13 @@ use Symfony\Component\Serializer\Annotation\SerializedName;
         ),
         new Post(
             controller: UploadMediaObjectAction::class,
-            deserialize: false, // 👈 1. Tell API Platform to not look for a matching JSON model
-            validate: false,    // 👈 2. Skip auto validation assertions
+            deserialize: false, //  1. Tell API Platform to not look for a matching JSON model
+            validate: false,    //  2. Skip auto validation assertions
             defaults: [
-                '_api_receive' => false, // 👈 3. CRITICAL: Tells API Platform to leave the raw request body stream alone
+                '_api_receive' => false, //  3. CRITICAL: Tells API Platform to leave the raw request body stream alone
             ],
             extraProperties: [
-                'use_symfony_listeners' => true // 👈 4. CRITICAL: Hands routing back to native Symfony kernel core listeners
+                'use_symfony_listeners' => true //  4. CRITICAL: Hands routing back to native Symfony kernel core listeners
             ],
             normalizationContext: ['groups' => ['media:read']],
             security: "is_granted('ROLE_USER')"

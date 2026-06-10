@@ -10,7 +10,7 @@ use Symfony\Bundle\SecurityBundle\Security;
 class ConversionJobPros implements ProcessorInterface
 {
     public function __construct(
-        #[Target('api_platform.doctrine.orm.state.persist_processor')] // 👈 2. TARGET THE CORE DOCTRINE WRITER EXPLICITLY
+        #[Target('api_platform.doctrine.orm.state.persist_processor')] //  2. TARGET THE CORE DOCTRINE WRITER EXPLICITLY
         private ProcessorInterface $persistProcessor,
         private Security $security
     ) {}

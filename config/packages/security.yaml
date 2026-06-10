@@ -31,6 +31,8 @@ security:
         main:
             lazy: true
             provider: app_user_provider
+            custom_authenticators:
+                - App\Security\GoogleAuthenticator
 
     access_control:
         - { path: ^/api/login_check, roles: PUBLIC_ACCESS }

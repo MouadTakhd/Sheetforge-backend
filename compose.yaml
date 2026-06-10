@@ -1,12 +1,10 @@
-version: '3.8'
 
 services:
-###> doctrine/doctrine-bundle ###
+  ###> doctrine/doctrine-bundle ###
   database:
     image: postgres:${POSTGRES_VERSION:-16}-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-app}
-      # You should definitely change the password in production
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-!ChangeMe!}
       POSTGRES_USER: ${POSTGRES_USER:-app}
     healthcheck:
@@ -16,9 +14,8 @@ services:
       start_period: 60s
     volumes:
       - database_data:/var/lib/postgresql/data:rw
-
-###< doctrine/doctrine-bundle ###
-
+  ###< doctrine/doctrine-bundle ###
+  
   backend:
     build:
       context: .
@@ -28,14 +25,12 @@ services:
       APP_SECRET: ${APP_SECRET:-!ChangeMe!}
       DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-!ChangeMe!}@database:5432/${POSTGRES_DB:-app}?serverVersion=${POSTGRES_VERSION:-16}&charset=utf8
       
-      # ─── BAKE FILE ALLOWANCES DIRECTLY INTO SYMFONY RUNTIME ───
-      # The Symfony skeleton automatically reads these to modify php.ini & webserver limits!
+      # Webserver Runtime Limits Modifications
       PHP_INI_UPLOAD_MAX_FILESIZE: "100M"
       PHP_INI_POST_MAX_SIZE: "108M"
       PHP_INI_MEMORY_LIMIT: "512M"
       PHP_INI_MAX_EXECUTION_TIME: "300"
 
-      # Injecting MinIO variables directly into the backend environment scope
       AWS_S3_KEY: ${AWS_S3_KEY:-local_s3_user}
       AWS_S3_SECRET: ${AWS_S3_SECRET:-local_s3_password}
       AWS_S3_REGION: ${AWS_S3_REGION:-us-east-1}
@@ -54,8 +49,9 @@ services:
   # Dedicated Local Cloud Storage Engine
   s3:
     image: minio/minio:latest
+    container_name: sheetforge_storage
     ports:
-      - "9000:9000"       # S3 API operations endpoint (Where Symfony streams data)
+      - "9000:9000"       # S3 API operations endpoint
       - "9001:9001"       # Visual Web Console Dashboard interface
     environment:
       MINIO_ROOT_USER: ${AWS_S3_KEY:-local_s3_user}
@@ -64,8 +60,39 @@ services:
       - s3_data:/data
     command: server /data --console-address ":9001"
 
+  # ─── THE BULLETPROOF AUTO-INITIALIZATION SERVICE ───
+  storage_init:
+    image: minio/mc:latest
+    container_name: sheetforge_storage_init
+    depends_on:
+      - s3
+    environment:
+      # Inject the variables cleanly into the initialization container scope
+      S3_KEY: ${AWS_S3_KEY:-local_s3_user}
+      S3_SECRET: ${AWS_S3_SECRET:-local_s3_password}
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for core MinIO engine socket to awaken...';
+      until curl -s http://s3:9000/minio/health/live; do sleep 1; done;
+
+      echo 'Registering S3 endpoint connection credentials...';
+      mc alias set sheetforge_local http://s3:9000 \$S3_KEY \$S3_SECRET;
+
+      echo 'Auto-creating conversion-bucket partitions...';
+      mc mb --ignore-existing sheetforge_local/conversion-bucket;
+
+      echo 'Enforcing top-level storage privacy boundaries...';
+      mc anonymous set private sheetforge_local/conversion-bucket;
+
+      echo '─── FIXING THE 403 FORBIDDEN ERROR PERMANENTLY ───';
+      echo 'Injecting public read policy on nested avatars using a custom JSON file...';
+      
+      echo '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"PublicAvatars\",\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":[\"s3:GetObject\"],\"Resource\":[\"arn:aws:s3:::conversion-bucket/*/avatars/*\"]}]}' > /tmp/p.json;
+      mc policy set-json /tmp/p.json sheetforge_local/conversion-bucket;
+
+      echo 'Storage cluster environment is initialized and unlocked!';
+      "
+
 volumes:
-###> doctrine/doctrine-bundle ###
   database_data:
-###< doctrine/doctrine-bundle ###
-  s3_data:                # Prevents local asset clear outs on container rebuilds
+  s3_data:
