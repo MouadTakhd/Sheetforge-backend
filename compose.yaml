@@ -15,7 +15,7 @@ services:
     volumes:
       - database_data:/var/lib/postgresql/data:rw
   ###< doctrine/doctrine-bundle ###
-  
+
   backend:
     build:
       context: .
@@ -24,7 +24,7 @@ services:
       APP_ENV: ${APP_ENV:-dev}
       APP_SECRET: ${APP_SECRET:-!ChangeMe!}
       DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-!ChangeMe!}@database:5432/${POSTGRES_DB:-app}?serverVersion=${POSTGRES_VERSION:-16}&charset=utf8
-      
+
       # Webserver Runtime Limits Modifications
       PHP_INI_UPLOAD_MAX_FILESIZE: "100M"
       PHP_INI_POST_MAX_SIZE: "108M"
@@ -67,30 +67,27 @@ services:
     depends_on:
       - s3
     environment:
-      # Inject the variables cleanly into the initialization container scope
       S3_KEY: ${AWS_S3_KEY:-local_s3_user}
       S3_SECRET: ${AWS_S3_SECRET:-local_s3_password}
     entrypoint: >
       /bin/sh -c "
-      echo 'Waiting for core MinIO engine socket to awaken...';
-      until curl -s http://s3:9000/minio/health/live; do sleep 1; done;
+      echo 'Waiting for MinIO to be ready...';
+      until mc alias set sheetforge_local http://s3:9000 \$S3_KEY \$S3_SECRET; do
+        echo 'MinIO not ready, retrying in 2s...';
+        sleep 2;
+      done;
 
-      echo 'Registering S3 endpoint connection credentials...';
-      mc alias set sheetforge_local http://s3:9000 \$S3_KEY \$S3_SECRET;
-
-      echo 'Auto-creating conversion-bucket partitions...';
+      echo 'Creating bucket...';
       mc mb --ignore-existing sheetforge_local/conversion-bucket;
 
-      echo 'Enforcing top-level storage privacy boundaries...';
+      echo 'Setting private policy...';
       mc anonymous set private sheetforge_local/conversion-bucket;
 
-      echo '─── FIXING THE 403 FORBIDDEN ERROR PERMANENTLY ───';
-      echo 'Injecting public read policy on nested avatars using a custom JSON file...';
-      
+      echo 'Injecting public avatars policy...';
       echo '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"PublicAvatars\",\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":[\"s3:GetObject\"],\"Resource\":[\"arn:aws:s3:::conversion-bucket/*/avatars/*\"]}]}' > /tmp/p.json;
       mc policy set-json /tmp/p.json sheetforge_local/conversion-bucket;
 
-      echo 'Storage cluster environment is initialized and unlocked!';
+      echo 'Done!';
       "
 
 volumes:
