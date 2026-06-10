@@ -29,14 +29,21 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' \
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Copy project FIRST (important for Symfony scripts like bin/console)
+# Copy project
 COPY . .
 
-# Install dependencies AFTER full code is present
+# Create a minimal .env so Symfony doesn't crash during build
+RUN echo "APP_ENV=prod\nAPP_SECRET=placeholder" > .env
+
+# Install dependencies
 RUN composer install \
     --no-dev \
     --optimize-autoloader \
-    --no-interaction
+    --no-interaction \
+    --no-scripts
+
+# Warm up the cache for prod
+RUN php bin/console cache:warmup --env=prod
 
 # PHP limits
 RUN echo "upload_max_filesize=100M" > /usr/local/etc/php/conf.d/uploads.ini && \
