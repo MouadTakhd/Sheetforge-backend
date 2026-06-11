@@ -12,7 +12,11 @@ security:
         dev:
             pattern: ^/(_profiler|_wdt|assets|build)/
             security: false
-        
+
+        health:
+            pattern: ^/health$
+            security: false
+
         login:
             pattern: ^/api/login_check
             stateless: true
@@ -35,6 +39,7 @@ security:
                 - App\Security\GoogleAuthenticator
 
     access_control:
+        - { path: ^/health, roles: PUBLIC_ACCESS }
         - { path: ^/api/login_check, roles: PUBLIC_ACCESS }
         - { path: ^/api/users, methods: [POST], roles: PUBLIC_ACCESS }
         - { path: ^/api/docs, roles: PUBLIC_ACCESS }
