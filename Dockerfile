@@ -15,7 +15,10 @@ RUN apt-get update && apt-get install -y \
 
 # 2. Install PHP extensions
 RUN docker-php-ext-install intl pdo_pgsql zip opcache
-
+RUN apt-get update && apt-get install -y \
+    tesseract-ocr \
+    libtesseract-dev \
+    && rm -rf /var/lib/apt/lists/*
 # 3. Configure Apache: rewrite module + headers module for reverse proxy
 RUN a2enmod rewrite headers remoteip
 ENV APACHE_DOCUMENT_ROOT=/srv/app/public
