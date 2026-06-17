@@ -89,4 +89,5 @@ CMD ["sh", "-c", "\
     mkdir -p var/cache/prod var/log && \
     chmod -R 777 var/ && \
     php bin/console cache:warmup --env=prod 2>&1 || true && \
+    php bin/console doctrine:migrations:migrate --no-interaction --env=prod 2>&1 || true && \
     apache2-foreground"]
