@@ -1,7 +1,12 @@
 nelmio_cors:
     defaults:
         origin_regex: true
-        allow_origin: ['%env(CORS_ALLOW_ORIGIN)%']
+        allow_origin:
+            # Local dev + anything set via the CORS_ALLOW_ORIGIN env var.
+            - '%env(CORS_ALLOW_ORIGIN)%'
+            # Vercel: production alias + per-deploy preview URLs for this project
+            # (the deploy hash changes every push, so we match the whole family).
+            - '^https://sheetforge[a-z0-9-]*\.vercel\.app$'
         allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
         allow_headers: ['Content-Type', 'Authorization']
         expose_headers: ['Link']
